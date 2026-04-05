@@ -34,8 +34,8 @@ MAX_WITHDRAW = 5000.0 # ₹
 ASK_AMOUNT, ASK_UPI = 1, 2
 
 # ─── Supabase ──────────────────────────────────────────────────────────────────
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DB HELPERS
