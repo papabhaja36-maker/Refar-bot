@@ -28,24 +28,25 @@ MIN_WITHDRAW = 10.0
 MAX_WITHDRAW = 5000.0
 ASK_AMOUNT, ASK_UPI = 1, 2
 
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "return=representation"
-}
+def get_headers():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
 
 def db_get(table, filters=None):
     url = f"{SUPABASE_URL}/rest/v1/{table}?select=*"
     if filters:
         for k, v in filters.items():
             url += f"&{k}=eq.{v}"
-    r = httpx.get(url, headers=HEADERS)
+    r = httpx.get(url, headers=get_headers())
     return r.json() if r.status_code == 200 else []
 
 def db_insert(table, data):
     url = f"{SUPABASE_URL}/rest/v1/{table}"
-    r = httpx.post(url, headers=HEADERS, json=data)
+    r = httpx.post(url, headers=get_headers(), json=data)
     return r.json() if r.status_code in (200, 201) else []
 
 def db_update(table, filters, data):
@@ -53,7 +54,7 @@ def db_update(table, filters, data):
     for k, v in filters.items():
         url += f"{k}=eq.{v}&"
     url = url.rstrip("&")
-    r = httpx.patch(url, headers=HEADERS, json=data)
+    r = httpx.patch(url, headers=get_headers(), json=data)
     return r.status_code in (200, 204)
 
 def get_user(user_id):
@@ -122,7 +123,7 @@ async def grant_referral_credit(bot, user_id):
         except Exception:
             pass
 
-async def start(update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
     ref_by = None
@@ -143,7 +144,7 @@ async def start(update, context):
         f"✅ *Welcome, {user.first_name}!*\n\nKya karna chahte ho?",
         parse_mode="Markdown", reply_markup=main_keyboard())
 
-async def button_handler(update, context):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user = query.from_user
@@ -249,7 +250,7 @@ async def button_handler(update, context):
             pass
         await query.edit_message_text(f"❌ *Cancelled & Refunded!* Request #{wd_id} | ₹{wd['amount']:.2f}", parse_mode="Markdown")
 
-async def text_handler(update, context):
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     state = context.user_data.get("state")
     text = update.message.text.strip()
@@ -269,7 +270,9 @@ async def text_handler(update, context):
             return
         context.user_data["withdraw_amount"] = amount
         context.user_data["state"] = ASK_UPI
-        await update.message.reply_text(f"✅ Amount: ₹{amount:.2f}\n\nAb apna *UPI ID* bhejo:\n(Jaise: name@paytm)", parse_mode="Markdown")
+        await update.message.reply_text(
+            f"✅ Amount: ₹{amount:.2f}\n\nAb apna *UPI ID* bhejo:\n(Jaise: name@paytm)",
+            parse_mode="Markdown")
 
     elif state == ASK_UPI:
         upi = text
@@ -305,7 +308,7 @@ async def text_handler(update, context):
                     InlineKeyboardButton("❌ Cancel & Refund", callback_data=f"cancel_{wd_id}")
                 ]]))
         except Exception as e:
-            logger.error(f"Admin notify error: {e}")
+            logger.error(f"Admin notify: {e}")
         context.user_data.clear()
     else:
         joined = await check_all_channels(context.bot, user.id)
@@ -314,7 +317,7 @@ async def text_handler(update, context):
         else:
             await update.message.reply_text("⚠️ Pehle channels join karo:", reply_markup=join_keyboard())
 
-async def admin_withdrawals(update, context):
+async def admin_withdrawals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     pending = db_get("withdrawals", {"status": "pending"})
@@ -330,7 +333,7 @@ async def admin_withdrawals(update, context):
             f"💸 *Request #{wd['id']}*\n👤 @{wd['username']} (`{wd['user_id']}`)\n💰 ₹{wd['amount']:.2f} | UPI: `{wd['upi_id']}`",
             parse_mode="Markdown", reply_markup=kb)
 
-async def admin_userinfo(update, context):
+async def admin_userinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     if not context.args:
@@ -349,7 +352,7 @@ async def admin_userinfo(update, context):
             text += f"{i}. `{r['referred_id']}` | ₹{r['amount']:.2f}\n"
     await update.message.reply_text(text, parse_mode="Markdown")
 
-async def admin_stats(update, context):
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     users = db_get("users")
@@ -358,7 +361,7 @@ async def admin_stats(update, context):
     approved = db_get("withdrawals", {"status": "approved"})
     paid = sum(w["amount"] for w in approved) if approved else 0
     await update.message.reply_text(
-        f"📊 *Bot Stats*\n\n👥 Users: {len(users)}\n🔗 Refers: {len(refs)}\n⏳ Pending Withdrawals: {len(pending)}\n💸 Total Paid: ₹{paid:.2f}",
+        f"📊 *Bot Stats*\n\n👥 Users: {len(users)}\n🔗 Refers: {len(refs)}\n⏳ Pending: {len(pending)}\n💸 Paid Out: ₹{paid:.2f}",
         parse_mode="Markdown")
 
 def main():
